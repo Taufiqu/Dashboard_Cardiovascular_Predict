@@ -1,10 +1,16 @@
 import json
-import joblib
-import numpy as np
 import os
+import sys
 import tempfile
 from pathlib import Path
-from urllib.request import urlopen
+
+try:
+    import joblib
+    import numpy as np
+    from urllib.request import urlopen
+except ImportError as e:
+    print(f"Import error: {e}")
+    sys.exit(1)
 
 # Feature order sesuai dengan features.json dari training pipeline
 # Urutan ini HARUS sama persis dengan urutan saat training
@@ -98,13 +104,20 @@ def handler(request):
     """
     Serverless function handler untuk predict cardiovascular disease
     """
-    # Handle CORS
-    headers = {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    try:
+        # Handle CORS
+        headers = {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        }
+    except Exception as e:
+        print(f"Error setting headers: {e}")
+        headers = {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+        }
 
     # Handle preflight request
     if request.method == 'OPTIONS':
