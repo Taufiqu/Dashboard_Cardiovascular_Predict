@@ -1,0 +1,20 @@
+[
+  "height",
+  "weight",
+  "ap_hi",
+  "ap_lo",
+  "smoke",
+  "alco",
+  "active",
+  "age_years",
+  "bmi",
+  "bp_diff",
+  "gender_male",
+  "cholesterol_2",
+  "cholesterol_3",
+  "gluc_2",
+  "gluc_3",
+  "age_cat_30-45",
+  "age_cat_45-60",
+  "age_cat_60+"
+]
