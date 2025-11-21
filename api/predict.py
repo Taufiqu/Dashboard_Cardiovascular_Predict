@@ -104,69 +104,89 @@ def handler(request):
     """
     Serverless function handler untuk predict cardiovascular disease
     """
+    # Handle CORS headers
+    headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    }
+    
+    # Wrapper untuk return error response
+    def error_response(status_code, error_msg, details=None):
+        response_body = {'error': error_msg}
+        if details:
+            response_body['details'] = str(details)
+        return {
+            'statusCode': status_code,
+            'headers': headers,
+            'body': json.dumps(response_body)
+        }
+    
     try:
-        # Handle CORS
-        headers = {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        }
-    except Exception as e:
-        print(f"Error setting headers: {e}")
-        headers = {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-        }
 
-    # Handle preflight request
-    if request.method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': ''
-        }
+        # Handle preflight request
+        if request.method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': ''
+            }
 
-    # Handle GET request dengan info message
-    if request.method == 'GET':
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps({
-                'message': 'Cardiovascular Prediction API',
-                'endpoint': '/api/predict',
-                'method': 'POST',
-                'status': 'Model loaded' if _model_loaded else 'Model not loaded yet'
-            })
-        }
+        # Handle GET request dengan info message
+        if request.method == 'GET':
+            model_status = 'loaded' if _model_loaded else 'not loaded'
+            env_check = {
+                'MODEL_URL': 'set' if os.environ.get('MODEL_URL') else 'not set',
+                'SCALER_URL': 'set' if os.environ.get('SCALER_URL') else 'not set'
+            }
+            return {
+                'statusCode': 200,
+                'headers': headers,
+                'body': json.dumps({
+                    'message': 'Cardiovascular Prediction API',
+                    'endpoint': '/api/predict',
+                    'method': 'POST',
+                    'model_status': model_status,
+                    'environment_variables': env_check
+                })
+            }
 
-    if request.method != 'POST':
-        return {
-            'statusCode': 405,
-            'headers': headers,
-            'body': json.dumps({'error': 'Method not allowed. Use POST method.'})
-        }
+        if request.method != 'POST':
+            return error_response(405, 'Method not allowed. Use POST method.')
 
-    try:
         # Load model jika belum di-load
         if not _model_loaded:
             try:
+                print("Attempting to load model...")
                 load_model_from_storage()
+                print("Model loaded successfully")
             except Exception as load_error:
-                return {
-                    'statusCode': 500,
-                    'headers': headers,
-                    'body': json.dumps({
-                        'error': 'Failed to load model',
-                        'details': str(load_error),
-                        'hint': 'Make sure MODEL_URL and SCALER_URL environment variables are set correctly.'
-                    })
-                }
+                import traceback
+                error_trace = traceback.format_exc()
+                print(f"Error loading model: {load_error}")
+                print(f"Traceback: {error_trace}")
+                return error_response(
+                    500, 
+                    'Failed to load model',
+                    {
+                        'error': str(load_error),
+                        'hint': 'Make sure MODEL_URL and SCALER_URL environment variables are set correctly.',
+                        'model_url_set': bool(os.environ.get('MODEL_URL')),
+                        'scaler_url_set': bool(os.environ.get('SCALER_URL'))
+                    }
+                )
         
         # Parse request body
-        # Vercel Python request.body adalah string
-        body_str = request.body if isinstance(request.body, str) else request.body.decode('utf-8')
-        body = json.loads(body_str) if body_str else {}
+        try:
+            # Vercel Python request.body adalah string
+            if hasattr(request, 'body'):
+                body_str = request.body if isinstance(request.body, str) else request.body.decode('utf-8')
+            else:
+                body_str = ''
+            body = json.loads(body_str) if body_str else {}
+        except Exception as parse_error:
+            return error_response(400, 'Invalid request body', str(parse_error))
         
         # Validasi input
         required_fields = ['age', 'gender', 'height', 'weight', 'ap_hi', 'ap_lo', 
@@ -174,24 +194,23 @@ def handler(request):
         
         for field in required_fields:
             if field not in body:
-                return {
-                    'statusCode': 400,
-                    'headers': headers,
-                    'body': json.dumps({'error': f'Missing field: {field}'})
-                }
+                return error_response(400, f'Missing required field: {field}')
 
         # Feature engineering - sama seperti di training pipeline
-        age_years = int(body['age'])
-        height = float(body['height'])
-        weight = float(body['weight'])
-        ap_hi = int(body['ap_hi'])
-        ap_lo = int(body['ap_lo'])
-        gender = int(body['gender'])
-        cholesterol = int(body['cholesterol'])
-        gluc = int(body['gluc'])
-        smoke = int(body['smoke'])
-        alco = int(body['alco'])
-        active = int(body['active'])
+        try:
+            age_years = int(body['age'])
+            height = float(body['height'])
+            weight = float(body['weight'])
+            ap_hi = int(body['ap_hi'])
+            ap_lo = int(body['ap_lo'])
+            gender = int(body['gender'])
+            cholesterol = int(body['cholesterol'])
+            gluc = int(body['gluc'])
+            smoke = int(body['smoke'])
+            alco = int(body['alco'])
+            active = int(body['active'])
+        except (ValueError, KeyError) as e:
+            return error_response(400, f'Invalid input value: {str(e)}')
 
         # Calculate derived features
         bmi = weight / ((height / 100) ** 2)
@@ -261,30 +280,17 @@ def handler(request):
                 })
             }
         else:
-            return {
-                'statusCode': 500,
-                'headers': headers,
-                'body': json.dumps({'error': 'Model not loaded'})
-            }
+            return error_response(500, 'Model not loaded. Please check server logs.')
 
-    except json.JSONDecodeError:
-        return {
-            'statusCode': 400,
-            'headers': headers,
-            'body': json.dumps({'error': 'Invalid JSON'})
-        }
+    except json.JSONDecodeError as e:
+        return error_response(400, 'Invalid JSON in request body', str(e))
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"Error in handler: {str(e)}")
+        print(f"Unexpected error in handler: {str(e)}")
         print(f"Traceback: {error_trace}")
-        return {
-            'statusCode': 500,
-            'headers': headers,
-            'body': json.dumps({
-                'error': 'Internal server error',
-                'message': str(e),
-                'type': type(e).__name__
-            })
-        }
+        return error_response(500, 'Internal server error', {
+            'message': str(e),
+            'type': type(e).__name__
+        })
 
