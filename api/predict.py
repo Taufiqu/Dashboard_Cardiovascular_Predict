@@ -114,17 +114,41 @@ def handler(request):
             'body': ''
         }
 
+    # Handle GET request dengan info message
+    if request.method == 'GET':
+        return {
+            'statusCode': 200,
+            'headers': headers,
+            'body': json.dumps({
+                'message': 'Cardiovascular Prediction API',
+                'endpoint': '/api/predict',
+                'method': 'POST',
+                'status': 'Model loaded' if _model_loaded else 'Model not loaded yet'
+            })
+        }
+
     if request.method != 'POST':
         return {
             'statusCode': 405,
             'headers': headers,
-            'body': json.dumps({'error': 'Method not allowed'})
+            'body': json.dumps({'error': 'Method not allowed. Use POST method.'})
         }
 
     try:
         # Load model jika belum di-load
         if not _model_loaded:
-            load_model_from_storage()
+            try:
+                load_model_from_storage()
+            except Exception as load_error:
+                return {
+                    'statusCode': 500,
+                    'headers': headers,
+                    'body': json.dumps({
+                        'error': 'Failed to load model',
+                        'details': str(load_error),
+                        'hint': 'Make sure MODEL_URL and SCALER_URL environment variables are set correctly.'
+                    })
+                }
         
         # Parse request body
         # Vercel Python request.body adalah string
@@ -237,9 +261,17 @@ def handler(request):
             'body': json.dumps({'error': 'Invalid JSON'})
         }
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error in handler: {str(e)}")
+        print(f"Traceback: {error_trace}")
         return {
             'statusCode': 500,
             'headers': headers,
-            'body': json.dumps({'error': str(e)})
+            'body': json.dumps({
+                'error': 'Internal server error',
+                'message': str(e),
+                'type': type(e).__name__
+            })
         }
 
