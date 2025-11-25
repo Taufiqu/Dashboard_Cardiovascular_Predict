@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 # Import dengan error handling yang lebih baik
@@ -11,10 +12,10 @@ try:
     from urllib.request import urlopen, Request
     from urllib.error import URLError, HTTPError
     IMPORTS_OK = True
-except ImportError as e:
-    print(f"Import error: {e}")
+except Exception as e: # Tangkap Exception general, bukan cuma ImportError
+    print(f"CRITICAL IMPORT ERROR: {e}")
+    print(traceback.format_exc()) # Print full traceback ke logs
     IMPORTS_OK = False
-    # Don't exit - let handler return error instead
 
 # Feature order sesuai dengan features.json dari training pipeline
 # Urutan ini HARUS sama persis dengan urutan saat training
