@@ -12,10 +12,17 @@ try:
     from urllib.request import urlopen, Request
     from urllib.error import URLError, HTTPError
     IMPORTS_OK = True
-except Exception as e: # Tangkap Exception general, bukan cuma ImportError
-    print(f"CRITICAL IMPORT ERROR: {e}")
-    print(traceback.format_exc()) # Print full traceback ke logs
+except Exception as e:
+    # Tangkap SEMUA jenis error (bukan cuma ImportError)
+    print("="*50)
+    print("CRITICAL STARTUP ERROR")
+    print(f"Error Type: {type(e).__name__}")
+    print(f"Error Message: {str(e)}")
+    print("Traceback:")
+    traceback.print_exc()
+    print("="*50)
     IMPORTS_OK = False
+# -------------------------------
 
 # Feature order sesuai dengan features.json dari training pipeline
 # Urutan ini HARUS sama persis dengan urutan saat training
