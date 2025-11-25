@@ -54,8 +54,16 @@ const Logging = () => {
         }
       })
 
+      // Coba ambil data sebagai JSON dulu, kalau gagal baru Text
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
       if (response.ok) {
-        const data = await response.json()
         setApiStatus({
           status: 'online',
           message: 'API is online',
@@ -63,13 +71,13 @@ const Logging = () => {
         })
         addLog('success', 'API is online', data)
       } else {
-        const errorText = await response.text()
+        // ERROR HANDLING DI SINI
         setApiStatus({
           status: 'error',
           message: `API returned error: ${response.status}`,
-          details: errorText
+          details: data // Sekarang ini Object, bukan String JSON
         })
-        addLog('error', `API error: ${response.status}`, errorText)
+        addLog('error', `API error: ${response.status}`, data)
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
@@ -112,12 +120,20 @@ const Logging = () => {
       const endTime = Date.now()
       const duration = endTime - startTime
 
+      // Logic ambil data diperbaiki biar support JSON error
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await response.json();
+      } else {
+        data = await response.text();
+      }
+
       if (response.ok) {
-        const data = await response.json()
         addLog('success', `Predict successful (${duration}ms)`, data)
       } else {
-        const errorText = await response.text()
-        addLog('error', `Predict failed: ${response.status} (${duration}ms)`, errorText)
+        // Ini akan menampilkan JSON error rapi di log
+        addLog('error', `Predict failed: ${response.status} (${duration}ms)`, data)
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
