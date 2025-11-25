@@ -175,71 +175,80 @@ def handler(request):
     """
     Serverless function handler untuk predict cardiovascular disease
     """
-    print("=" * 50)
-    print("Handler called")
-    print(f"IMPORTS_OK: {IMPORTS_OK}")
-    print(f"Request type: {type(request)}")
-    print(f"Request: {request}")
-    print("=" * 50)
+    # Default headers - bisa diakses di semua scope
+    default_headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+        'Access-Control-Allow-Headers': 'Content-Type',
+    }
     
-    # Check imports first
-    if not IMPORTS_OK:
-        print("ERROR: Imports failed")
+    # Helper function untuk error response - bisa diakses di semua scope
+    def make_error_response(status_code, error_msg, details=None, custom_headers=None):
+        response_body = {'error': error_msg}
+        if details:
+            if isinstance(details, dict):
+                response_body['details'] = details
+            else:
+                response_body['details'] = str(details)
         return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'error': 'Required Python packages not available',
-                'details': 'joblib, numpy, or scikit-learn may not be installed'
-            })
+            'statusCode': status_code,
+            'headers': custom_headers or default_headers,
+            'body': json.dumps(response_body)
         }
     
-    # Initialize dengan error handling
+    # Wrap seluruh handler dengan try-except untuk catch semua error
     try:
-        print("Initializing handler...")
-        # Handle CORS headers
-        headers = {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        }
+        print("=" * 50)
+        print("Handler called")
+        print(f"IMPORTS_OK: {IMPORTS_OK}")
+        print(f"Request type: {type(request)}")
+        if request:
+            try:
+                print(f"Request attributes: {dir(request)}")
+            except:
+                pass
+        print("=" * 50)
         
-        # Wrapper untuk return error response
+        # Check imports first
+        if not IMPORTS_OK:
+            print("ERROR: Imports failed")
+            return make_error_response(500, 'Required Python packages not available', 
+                'joblib, numpy, or scikit-learn may not be installed')
+        
+        # Initialize
+        print("Initializing handler...")
+        headers = default_headers.copy()
+        
+        # Wrapper untuk return error response (local scope)
         def error_response(status_code, error_msg, details=None):
-            response_body = {'error': error_msg}
-            if details:
-                if isinstance(details, dict):
-                    response_body['details'] = details
-                else:
-                    response_body['details'] = str(details)
-            return {
-                'statusCode': status_code,
-                'headers': headers,
-                'body': json.dumps(response_body)
-            }
+            return make_error_response(status_code, error_msg, details, headers)
         
         # Check request object
         if request is None:
             return error_response(500, 'Request object is None')
         
-        # Get method safely
-        method = getattr(request, 'method', 'GET')
+        # Get method safely - handle different request object formats
+        try:
+            method = request.method
+        except AttributeError:
+            # Try alternative ways to get method
+            method = getattr(request, 'method', None) or getattr(request, 'httpMethod', None) or 'GET'
         
+        print(f"Request method: {method}")
+    
     except Exception as init_error:
         import traceback
-        print(f"Error in handler initialization: {init_error}")
-        print(traceback.format_exc())
-        return {
-            'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
-            'body': json.dumps({
-                'error': 'Handler initialization failed',
-                'details': str(init_error),
-                'type': type(init_error).__name__
-            })
-        }
+        error_trace = traceback.format_exc()
+        print(f"CRITICAL ERROR in handler initialization: {init_error}")
+        print(f"Traceback: {error_trace}")
+        return make_error_response(500, 'Handler initialization failed', {
+            'error': str(init_error),
+            'type': type(init_error).__name__,
+            'traceback': error_trace
+        })
     
+    # Main handler logic
     try:
 
         # Handle preflight request
@@ -420,13 +429,32 @@ def handler(request):
             return error_response(500, 'Model not loaded. Please check server logs.')
 
     except json.JSONDecodeError as e:
-        return error_response(400, 'Invalid JSON in request body', str(e))
+        try:
+            return error_response(400, 'Invalid JSON in request body', str(e))
+        except:
+            return make_error_response(400, 'Invalid JSON in request body', str(e))
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         print(f"Unexpected error in handler: {str(e)}")
         print(f"Traceback: {error_trace}")
-        return error_response(500, 'Internal server error', {
+        try:
+            return error_response(500, 'Internal server error', {
+                'message': str(e),
+                'type': type(e).__name__
+            })
+        except:
+            return make_error_response(500, 'Internal server error', {
+                'message': str(e),
+                'type': type(e).__name__
+            })
+    except BaseException as e:
+        # Catch semua error termasuk SystemExit, KeyboardInterrupt, dll
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"CRITICAL ERROR (BaseException): {str(e)}")
+        print(f"Traceback: {error_trace}")
+        return make_error_response(500, 'Critical server error', {
             'message': str(e),
             'type': type(e).__name__
         })
