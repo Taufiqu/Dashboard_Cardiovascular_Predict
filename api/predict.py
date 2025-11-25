@@ -4,14 +4,24 @@ import sys
 import os
 import traceback
 
+# --- HANDLER ---
 def handler(request):
     # Setup Headers
     headers = {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     }
 
-    # 1. Cek Info Environment System
+    # Handle OPTIONS (Preflight)
+    if hasattr(request, 'method') and request.method == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': headers,
+            'body': ''
+        }
+
+    # 1. Cek Info System
     sys_info = {
         "python_version": sys.version,
         "platform": sys.platform,
@@ -19,7 +29,7 @@ def handler(request):
     }
 
     # 2. Coba Import Library Satu per Satu (Safely)
-    # Ini akan memberi tahu kita library mana yang bikin crash
+    # Kita import di DALAM handler biar kalau crash bisa ditangkap try-except
     lib_status = {}
     
     # Cek Numpy
@@ -28,6 +38,7 @@ def handler(request):
         lib_status["numpy"] = f"Success ({numpy.__version__})"
     except Exception as e:
         lib_status["numpy"] = f"FAILED: {str(e)}"
+        lib_status["numpy_trace"] = traceback.format_exc()
 
     # Cek Joblib
     try:
@@ -42,12 +53,10 @@ def handler(request):
         lib_status["sklearn"] = f"Success ({sklearn.__version__})"
     except Exception as e:
         lib_status["sklearn"] = f"FAILED: {str(e)}"
-        # Coba tangkap error binary/linking yang lebih dalam
-        lib_status["sklearn_traceback"] = traceback.format_exc()
+        lib_status["sklearn_trace"] = traceback.format_exc()
 
     # 3. Return JSON Diagnostic
-    # Kalau ini berhasil muncul di browser, berarti Server Vercel SEHAT.
-    # Masalahnya cuma di library.
+    # Kalau JSON ini muncul di browser/logging, berarti server SUDAH HIDUP.
     return {
         'statusCode': 200,
         'headers': headers,
