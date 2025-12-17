@@ -2,7 +2,7 @@ import './Analytics.css'
 
 const Analytics = () => {
   // Ganti URL ini dengan embed URL dari Looker Studio kamu
-  const lookerStudioUrl = "https://lookerstudio.google.com/embed/reporting/YOUR_REPORT_ID/page/YOUR_PAGE_ID"
+  const lookerStudioUrl = "https://lookerstudio.google.com/embed/reporting/a08cffd2-0679-4b10-b642-dd128d328efc/page/AwFiF"
 
   return (
     <div className="analytics-container">

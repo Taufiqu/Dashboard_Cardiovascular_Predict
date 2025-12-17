@@ -29,12 +29,12 @@ const Navbar = () => {
           >
             About
           </Link>
-          <Link 
+          {/* <Link 
             to="/logging" 
             className={location.pathname === '/logging' ? 'active' : ''}
           >
             Logging
-          </Link>
+          </Link> */}
         </div>
       </div>
     </nav>
